@@ -23,11 +23,6 @@ class Vertex {
         this.hitboxRadius = hitboxRadius
         this.isHighlighted = false;
     }
-
-    isHitboxHit(x, y) {
-        return (this.x - this.hitboxRadius <= x && x <= this.x + this.hitboxRadius)
-            && (this.y - this.hitboxRadius <= y && y <= this.y + this.hitboxRadius)
-    }
 }
 
 var vertices = [];
@@ -62,34 +57,60 @@ window.onresize = function() {
 }
 
 
-// function freeVertices() {
-//     selectedVertices = [];
-//     highlightedVertices = [];
-// }
+function isHitboxHit(x, y, vertex) {
+    // Так как у нас есть отображение одного базиса на другой,
+    // а хитбокс обрабатывается в игровом поле,
+    // при сжатии окна хитбокс будет сжиматься,
+    // а нарисованный радиус вершины -- нет,
+    // поэтому мы тут отжимаем хитбокс обратно
+    hitbox = WindowToPlane(vertex.hitboxRadius, vertex.hitboxRadius);
+    return (vertex.x - hitbox.x <= x && x <= vertex.x + hitbox.x)
+            && (vertex.y - hitbox.y <= y && y <= vertex.y + hitbox.y)
+}
 
-// canvas.addEventListener('mousedown', (e) => {
-//     const mouseP = WindowToPlane(e.clientX, e.clientY);
+function freeVertices() {
+    selectedVertices = [];
+    highlightedVertices = [];
+}
 
-//     touchedVertex = vertices.filter(v => v.isHitboxHit(mouseP.x, mouseP.y))[0];
-//     selectedVertices.push(touchedVertex);
-// });
+function colorSelectedNeighbors() {}
 
-// canvas.addEventListener('mousemove', (e) => {
-//     selectedVertices.forEach(vertex => {
-//         const mouseP = WindowToPlane(e.clientX, e.clientY);
-//         if (vertex) {
-//             vertex.x = mouseP.x;
-//             vertex.y = mouseP.y;
-//         }
-//     });
-// });
+var prevMouseP = null;
 
-// canvas.addEventListener('mouseup', () => {
-//     freeVertices();
-// });
-// canvas.addEventListener('mouseleave', () => {
-//     freeVertices();
-// });
+canvas.addEventListener('mousedown', (e) => {
+    const mouseP = WindowToPlane(e.clientX, e.clientY);
+
+    touchedVertex = vertices.filter(v => isHitboxHit(mouseP.x, mouseP.y, v))[0];
+    selectedVertices.push(touchedVertex);
+
+    prevMouseP = mouseP;
+    console.log(prevMouseP);
+});
+
+canvas.addEventListener('mousemove', (e) => {
+    if (!prevMouseP) {
+        return;
+    }
+    const mouseP = WindowToPlane(e.clientX, e.clientY);
+    deltaMouseP = {
+        x: mouseP.x - prevMouseP.x,
+        y: mouseP.y - prevMouseP.y,
+    }
+    selectedVertices.forEach(vertex => {
+        if (vertex) {
+            vertex.x += deltaMouseP.x;
+            vertex.y += deltaMouseP.y;
+        }
+    });
+    prevMouseP = mouseP;
+});
+
+canvas.addEventListener('mouseup', () => {
+    freeVertices();
+});
+canvas.addEventListener('mouseleave', () => {
+    freeVertices();
+});
 
 
 function drawBackground() {
@@ -103,13 +124,10 @@ function drawVertices() {
 
         context.beginPath();
         context.arc(point.x, point.y, config.vertexRadius, 0, Math.PI*2);
-        context.fillStyle = 'rgb(0, 0, 0)';
-        context.fill();
-        context.closePath();
-        context.beginPath();
-        context.arc(point.x, point.y, config.vertexRadius * 0.9, 0, Math.PI*2);
         context.fillStyle = config.basicVertexColor;
         context.fill();
+        context.lineWidth = config.vertexRadius * 0.1;
+        context.stroke();
         context.closePath();
     });
 }
@@ -118,15 +136,15 @@ function drawEdges() {
     let visitedVertices = new Set();
     vertices.forEach(vertex => {
         vertex.neighbors.forEach(neighborVertex => {
-            if (neighborVertex in visitedVertices) {
+            if (visitedVertices.has(neighborVertex)) {
                 return;
             }
 
             let point = PlaneToWindow(vertex.x, vertex.y);
-            let neighborPoint = PlaneToWindow(vertex.x, vertex.y);
+            let neighborPoint = PlaneToWindow(neighborVertex.x, neighborVertex.y);
 
             context.lineWidth = config.edgeWidth;
-            // context.strokeStyle = 'rgba(64, 30, 91, '+ opacity +')';
+            context.strokeStyle = config.basicEdgeColor;
 
             context.beginPath();
             context.moveTo(point.x, point.y);
@@ -150,20 +168,14 @@ function loop() {
 }
 
 function init() {
-    // for (var i = 0; i < config.verticesCount; i++) {
-    //     x = i / (config.verticesCount - 1) * (config.gamePlaneWidth - config.vertexRadius * 2) + config.vertexRadius;
-    //     y = i / (config.verticesCount - 1) * (config.gamePlaneHeight - config.vertexRadius * 2) + config.vertexRadius;
-
-    //     vertices.push(new Vertex(x, y));
-    // }
     let v1 = new Vertex(250, 250, config.vertexRadius);
     let v2 = new Vertex(750, 250, config.vertexRadius);
     let v3 = new Vertex(250, 750, config.vertexRadius);
     let v4 = new Vertex(750, 750, config.vertexRadius);
-    v1.neighbors = [v2, v3, v4];
+    v1.neighbors = [v2, v3];
     v2.neighbors = [v1, v3, v4];
     v3.neighbors = [v1, v2, v4];
-    v4.neighbors = [v1, v2, v3];
+    v4.neighbors = [v2, v3];
     vertices = [v1, v2, v3, v4];
 
     loop();
