@@ -27,7 +27,7 @@ class Vertex {
 
 var vertices = [];
 var selectedVertices = [];
-var highlightedVertices = [];
+var highlightedVertices = new Set();
 
 var canvas = document.createElement('canvas');
 canvas.width = innerWidth;
@@ -70,21 +70,41 @@ function isHitboxHit(x, y, vertex) {
 
 function freeVertices() {
     selectedVertices = [];
-    highlightedVertices = [];
+
+    highlightedVertices.forEach(vertex => {
+        vertex.isHighlighted = false;
+    });
+    highlightedVertices = new Set();
 }
 
-function colorSelectedNeighbors() {}
 
 var prevMouseP = null;
 
 canvas.addEventListener('mousedown', (e) => {
     const mouseP = WindowToPlane(e.clientX, e.clientY);
 
-    touchedVertex = vertices.filter(v => isHitboxHit(mouseP.x, mouseP.y, v))[0];
-    selectedVertices.push(touchedVertex);
+    const touchedVertex = vertices.filter(v => isHitboxHit(mouseP.x, mouseP.y, v))[0];
+    if (touchedVertex) {
+        selectedVertices.push(touchedVertex);
+    }
+
+    // highlight selected vertices and their neighbors
+    selectedVertices.forEach(vertex => {
+        if (highlightedVertices.has(vertex)) {
+            return;
+        }
+        vertex.isHighlighted = true;
+        highlightedVertices.add(vertex);
+        vertex.neighbors.forEach(neighborVertex => {
+            if (highlightedVertices.has(neighborVertex)) {
+                return;
+            }
+            neighborVertex.isHighlighted = true;
+            highlightedVertices.add(neighborVertex);
+    });
+    });
 
     prevMouseP = mouseP;
-    console.log(prevMouseP);
 });
 
 canvas.addEventListener('mousemove', (e) => {
@@ -113,6 +133,7 @@ canvas.addEventListener('mouseleave', () => {
 });
 
 
+
 function drawBackground() {
     context.fillStyle = config.backgroundColor;
     context.fillRect(0, 0, canvas.width, canvas.height);
@@ -124,7 +145,11 @@ function drawVertices() {
 
         context.beginPath();
         context.arc(point.x, point.y, config.vertexRadius, 0, Math.PI*2);
-        context.fillStyle = config.basicVertexColor;
+        if (vertex.isHighlighted) {
+            context.fillStyle = config.highlightedVertexColor;
+        } else {
+            context.fillStyle = config.basicVertexColor;
+        }
         context.fill();
         context.lineWidth = config.vertexRadius * 0.1;
         context.stroke();
@@ -140,11 +165,17 @@ function drawEdges() {
                 return;
             }
 
+            // const needToHighlight = vertex.isHighlighted && neighborVertex.isHighlighted;
+
             let point = PlaneToWindow(vertex.x, vertex.y);
             let neighborPoint = PlaneToWindow(neighborVertex.x, neighborVertex.y);
 
-            context.lineWidth = config.edgeWidth;
-            context.strokeStyle = config.basicEdgeColor;
+            // context.lineWidth = config.edgeWidth;
+            // if (needToHighlight) {
+            //     context.strokeStyle = config.highlightedEdgeColor;
+            // } else {
+                context.strokeStyle = config.basicEdgeColor;
+            // }
 
             context.beginPath();
             context.moveTo(point.x, point.y);
