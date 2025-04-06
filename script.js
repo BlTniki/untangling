@@ -1,11 +1,11 @@
 config = {
     gamePlaneWidth: 1000,
     gamePlaneHeight: 1000,
-    verticesCount: 5,
-    vertexRadius: 25,
+    verticesCount: 20,
+    vertexRadius: 12,
     basicVertexColor: 'rgb(0, 80, 177)',
     highlightedVertexColor: 'rgb(177, 0, 0)',
-    edgeWidth: 2,
+    edgeWidth: 3,
     basicEdgeColor: 'rgb(0,0,0)',
     highlightedEdgeColor: 'rgb(223, 216, 0)',
     backgroundColor: 'rgb(255, 255, 255)'
@@ -15,168 +15,50 @@ if (!EPS) {
     var EPS = 1E-9;
 }
 
-class Vertex {
-    constructor (x, y, hitboxRadius, neighbors=null) {
-        this.x = x;
-        this.y = y;
-        if (neighbors == null) {
-            this.neighbors = [];
-        } else {
-            this.neighbors = neighbors;
-        }
-        this.hitboxRadius = hitboxRadius
-        this.isHighlighted = false;
-    }
-}
 
-class Edge {
-    /** 
-    * @param {Vertex} v1 segment start vertex
-    * @param {Vertex} v2 segment end vertex
-    */
-    constructor(v1, v2) {
-        // смещение начала сегмента и конца на радиус хитбокса вершины
-        // чтобы при поиске пересечений сегментов 
-        this.v1 = v1;
-        this.v2 = v2;
-        this.isIntersect = false;
-        this.ID = `x${v1.x}y${v1.y}x${v2.x}y${v2.y}`;
-    }
-
-    toSegment() {
-        // смещение начала сегмента и конца на радиус хитбокса вершины
-        // чтобы при поиске пересечений сегментов пересечения на концах сегментов не учитывалось
-        let r = [this.v2.x - this.v1.x, this.v2.y - this.v1.y]; // вектор перехода из v1 в v2
-        let d = 10 / Math.sqrt(r[0]*r[0] + r[1]*r[1]); // необходимая длина вектора смещения
-        let dr = [d*r[0], d*r[1]]; // необходимый вектор смещения
-        return [
-            [this.v1.x + dr[0], this.v1.y + dr[1]],
-            [this.v2.x - dr[0], this.v2.y - dr[1]]
-        ]
-    }
-}
-
-var vertices = [];
-var selectedVertices = [];
-var highlightedVertices = new Set();
-
-var edges = [];
-var edgesMap = {};
-var intersectEdgeIDs = new Set();
-
-function checkIntersections() {
-    segments = {}
-    edges.forEach(edge => {
-        segments[edge.ID] = edge.toSegment();
-    });
-    let newIntersectEdgeIDs = new Set(
-        findIntersections(segments)
-            .flatMap(intersect => intersect.segmentID)
-    );
-    let toIntersect = newIntersectEdgeIDs.difference(intersectEdgeIDs);
-    let toClear = intersectEdgeIDs.difference(newIntersectEdgeIDs);
-    toIntersect.forEach(edgeID => edgesMap[edgeID].isIntersect = true);
-    toClear.forEach(edgeID => edgesMap[edgeID].isIntersect = false);
-    intersectEdgeIDs = newIntersectEdgeIDs;
-}
-
-var canvas = document.createElement('canvas');
-canvas.width = innerWidth;
-canvas.height = innerHeight;
+var canvas = document.querySelector('canvas');
+var canvasBoundary = canvas.getBoundingClientRect();
+canvas.width = canvasBoundary.width;
+canvas.height = canvasBoundary.height;
 context = canvas.getContext('2d');
 
-function PlaneToWindow(x, y) {
+function PlaneToCanvas(x, y) {
     return {
         x: x * canvas.width / config.gamePlaneWidth,
         y: y * canvas.height / config.gamePlaneHeight
     }
 }
 
-function WindowToPlane(x, y) {
+function CanvasToPlane(x, y) {
     return {
         x: x / canvas.width * config.gamePlaneWidth,
         y: y / canvas.height * config.gamePlaneHeight
     }
 }
 
-
-document.querySelector('body').appendChild(canvas);
+function WindowToCanvas(x, y) {
+    const boundary = canvas.getBoundingClientRect();
+    return {
+        x: x - boundary.x,
+        y: y - boundary.y
+    }
+}
 
 window.onresize = function() {
     canvas.width = innerWidth;
     canvas.height = innerHeight;
 }
 
-
-function isHitboxHit(x, y, vertex) {
-    // Так как у нас есть отображение одного базиса на другой,
-    // а хитбокс обрабатывается в игровом поле,
-    // при сжатии окна хитбокс будет сжиматься,
-    // а нарисованный радиус вершины -- нет,
-    // поэтому мы тут отжимаем хитбокс обратно
-    hitbox = WindowToPlane(vertex.hitboxRadius, vertex.hitboxRadius);
-    return (vertex.x - hitbox.x <= x && x <= vertex.x + hitbox.x)
-            && (vertex.y - hitbox.y <= y && y <= vertex.y + hitbox.y)
-}
-
-function freeVertices() {
-    selectedVertices = [];
-
-    highlightedVertices.forEach(vertex => {
-        vertex.isHighlighted = false;
-    });
-    highlightedVertices = new Set();
-}
-
-
-var prevMouseP = null;
-
 canvas.addEventListener('mousedown', (e) => {
-    const mouseP = WindowToPlane(e.clientX, e.clientY);
-    console.log(mouseP);
-
-    const touchedVertex = vertices.filter(v => isHitboxHit(mouseP.x, mouseP.y, v))[0];
-    if (touchedVertex) {
-        selectedVertices.push(touchedVertex);
-    }
-
-    // highlight selected vertices and their neighbors
-    selectedVertices.forEach(vertex => {
-        if (highlightedVertices.has(vertex)) {
-            return;
-        }
-        vertex.isHighlighted = true;
-        highlightedVertices.add(vertex);
-        vertex.neighbors.forEach(neighborVertex => {
-            if (highlightedVertices.has(neighborVertex)) {
-                return;
-            }
-            neighborVertex.isHighlighted = true;
-            highlightedVertices.add(neighborVertex);
-    });
-    });
-
-    prevMouseP = mouseP;
+    const mouseC = WindowToCanvas(e.clientX, e.clientY)
+    const mouseP = CanvasToPlane(mouseC.x, mouseC.y);
+    selectVertices(mouseP);
 });
-
 canvas.addEventListener('mousemove', (e) => {
-    if (!prevMouseP) {
-        return;
-    }
-    const mouseP = WindowToPlane(e.clientX, e.clientY);
-    deltaMouseP = {
-        x: mouseP.x - prevMouseP.x,
-        y: mouseP.y - prevMouseP.y,
-    }
-    selectedVertices.forEach(vertex => {
-        if (vertex) {
-            vertex.x += deltaMouseP.x;
-            vertex.y += deltaMouseP.y;
-        }
-    });
-    prevMouseP = mouseP;
+    const mouseC = WindowToCanvas(e.clientX, e.clientY)
+    const mouseP = CanvasToPlane(mouseC.x, mouseC.y);
+    moveSelectedVertices(e)
 });
-
 canvas.addEventListener('mouseup', () => {
     freeVertices();
 });
@@ -193,7 +75,7 @@ function drawBackground() {
 
 function drawVertices() {
     vertices.forEach(vertex => {
-        let point = PlaneToWindow(vertex.x, vertex.y);
+        let point = PlaneToCanvas(vertex.x, vertex.y);
 
         context.beginPath();
         context.arc(point.x, point.y, config.vertexRadius, 0, Math.PI*2);
@@ -212,61 +94,92 @@ function drawVertices() {
 function drawEdges() {
     edges.forEach(edge => {
         let planeSegment = edge.toSegment();
-        let windowSegmentStart = PlaneToWindow(planeSegment[0][0], planeSegment[0][1]);
-        let windowSegmentEnd = PlaneToWindow(planeSegment[1][0], planeSegment[1][1]);
+        let windowSegmentStart = PlaneToCanvas(planeSegment[0][0], planeSegment[0][1]);
+        let windowSegmentEnd = PlaneToCanvas(planeSegment[1][0], planeSegment[1][1]);
 
+        context.beginPath();
+        context.moveTo(windowSegmentStart.x, windowSegmentStart.y);
+        context.lineTo(windowSegmentEnd.x, windowSegmentEnd.y);
+        const prevStrokeStyle = context.strokeStyle;
+        const prevStrokeWidth = context.lineWidth;
         if (edge.isIntersect) {
             context.strokeStyle = config.basicEdgeColor;
         } else {
             context.strokeStyle = config.highlightedEdgeColor;
         }
-
-        context.beginPath();
-        context.moveTo(windowSegmentStart.x, windowSegmentStart.y);
-        context.lineTo(windowSegmentEnd.x, windowSegmentEnd.y);
+        context.lineWidth = config.edgeWidth;
         context.stroke();
+        context.strokeStyle = prevStrokeStyle;
+        context.lineWidth = prevStrokeWidth;
         context.closePath();
     });
 }
 
+class StateMachine {
+    constructor(startTime) {
+        this.isNoIntersectionAchieved = true;
+        this.outputState = (output => {
+            console.log(output)
+        });
+        this.finalOutput = null;
+    }
 
+    measureTime() {
+        const currentTime = performance.now();
+        const elapsedTime = (currentTime - this.startTime) / 1000; // в секундах
+        const roundedTime = Math.round(elapsedTime * 10) / 10; // округляем до 0.1
+        return roundedTime;
+    }
+
+    start() {
+        this.startTime = performance.now();
+    }
+    updateState(countOfIntersections) {
+        if (this.isNoIntersectionAchieved) {
+            const output = `${countOfIntersections} intersections in ${this.measureTime()} s`;
+            this.outputState(output);
+            if (countOfIntersections === 0) {
+                this.isNoIntersectionAchieved = false;
+                this.finalOutput = output;
+            }
+        } else {
+            this.outputState(this.finalOutput);
+        }
+
+    }
+}
+var stateMachine = new StateMachine();
 
 function loop() {
-    checkIntersections();
+    const countOfIntersections = checkIntersections();
 
     drawBackground();
 
     drawEdges();
     drawVertices();
 
+    stateMachine.updateState(countOfIntersections);
     requestAnimationFrame(loop);
 }
 
 
-
 function init() {
-    var v1 = new Vertex(250, 250, config.vertexRadius);
-    var v2 = new Vertex(750, 250, config.vertexRadius);
-    var v3 = new Vertex(250, 750, config.vertexRadius);
-    var v4 = new Vertex(750, 750, config.vertexRadius);
-    v1.neighbors = [v2, v3];
-    v2.neighbors = [v1, v3, v4];
-    v3.neighbors = [v1, v2, v4];
-    v4.neighbors = [v2, v3];
-    vertices = [v1, v2, v3, v4];
+    stateMachine.start(); 
 
-    edges = [
-        new Edge(v1, v2),
-        new Edge(v1, v3),
-        new Edge(v2, v3),
-        new Edge(v2, v4),
-        new Edge(v3, v4)
-    ];
-    edges.forEach(edge => {
-        edgesMap[edge.ID] = edge;
-    });
-
+    initPlanarGraph();
+    // initManualGraph();
     loop();
 }
 
-init();
+document.addEventListener("DOMContentLoaded", () => {
+    const verticesInput = document.getElementById("verticesInput");
+    const textOutput = document.getElementById("textOutput");
+    const startButton = document.getElementById("startButton");
+
+    stateMachine.outputState = (output => textOutput.textContent = output);
+
+    startButton.addEventListener("click", () => {
+        config.verticesCount = Number(verticesInput.value);
+        init();
+    });
+});

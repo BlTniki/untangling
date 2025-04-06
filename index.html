@@ -2,15 +2,23 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Untagling</title>
 
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <div class="control-panel">
+        <input type="number" id="verticesInput" placeholder="Put number of vertices", value="10">
+        <button id="startButton">Нажми меня</button>
+        <span id="textOutput">Здесь будет вывод</span>
+    </div>
+    <div class="canvas-window">
+        <canvas></canvas>
+    </div>
 
     <script src="bentley-ottman/findIntersections.js"></script>
+    <script src="game.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
