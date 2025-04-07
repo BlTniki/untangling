@@ -240,10 +240,15 @@ function initPlanarGraph() {
     }
 
     // пытаемся сгенерировать граф столько раз, пока не выйдет
-    while (!generatePlanarGraph(config.verticesCount)) {
+    let attemptsCounter = 0;
+    while (!generatePlanarGraph(config.verticesCount) && attemptsCounter++ <= 5000) {
         console.warn('Failed to generate planar graph. Retrying...');
     }
-    scatterVerticesRandomly(vertices, config.gamePlaneWidth, config.gamePlaneHeight, config.vertexRadius)
+    if (attemptsCounter < 5000) {
+        scatterVerticesRandomly(vertices, config.gamePlaneWidth, config.gamePlaneHeight, config.vertexRadius)
+    } else {
+        console.error('Failed to generate planar graph after 5k attempts. Stopping...');
+    }
 }
 
 function initManualGraph() {

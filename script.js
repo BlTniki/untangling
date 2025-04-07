@@ -116,7 +116,7 @@ function drawEdges() {
 }
 
 class StateMachine {
-    constructor(startTime) {
+    constructor() {
         this.isNoIntersectionAchieved = true;
         this.outputState = (output => {
             console.log(output)
@@ -133,6 +133,8 @@ class StateMachine {
 
     start() {
         this.startTime = performance.now();
+        this.isNoIntersectionAchieved = true;
+        this.finalOutput = null;
     }
     updateState(countOfIntersections) {
         if (this.isNoIntersectionAchieved) {
@@ -164,10 +166,11 @@ function loop() {
 
 
 function init() {
-    stateMachine.start(); 
-
     initPlanarGraph();
     // initManualGraph();
+
+    stateMachine.start(); 
+
     loop();
 }
 
