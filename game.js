@@ -39,29 +39,165 @@ class Edge {
     }
 }
 
-var vertices = [];
-var selectedVertices = [];
-var highlightedVertices = new Set();
+class GameTimer {
+    constructor() {
+        this.isNoIntersectionAchieved = true;
+        this.outputState = (output => {
+            console.log(output)
+        });
+        this.finalOutput = null;
+    }
 
-var edges = [];
-var edgesMap = {};
-var intersectEdgeIDs = new Set();
+    measureTime() {
+        const currentTime = performance.now();
+        const elapsedTime = (currentTime - this.startTime) / 1000; // в секундах
+        const roundedTime = Math.round(elapsedTime * 10) / 10; // округляем до 0.1
+        return roundedTime;
+    }
 
-function checkIntersections() {
-    segments = {}
-    edges.forEach(edge => {
-        segments[edge.ID] = edge.toSegment();
-    });
-    let newIntersectEdgeIDs = new Set(
-        findIntersections(segments)
-            .flatMap(intersect => intersect.segmentID)
-    );
-    let toIntersect = newIntersectEdgeIDs.difference(intersectEdgeIDs);
-    let toClear = intersectEdgeIDs.difference(newIntersectEdgeIDs);
-    toIntersect.forEach(edgeID => edgesMap[edgeID].isIntersect = true);
-    toClear.forEach(edgeID => edgesMap[edgeID].isIntersect = false);
-    intersectEdgeIDs = newIntersectEdgeIDs;
-    return intersectEdgeIDs.size
+    start() {
+        this.startTime = performance.now();
+        this.isNoIntersectionAchieved = true;
+        this.finalOutput = null;
+    }
+    updateState(countOfIntersections) {
+        if (this.isNoIntersectionAchieved) {
+            const output = `${countOfIntersections} intersections in ${this.measureTime()} s`;
+            this.outputState(output);
+            if (countOfIntersections === 0) {
+                this.isNoIntersectionAchieved = false;
+                this.finalOutput = output;
+            }
+        } else {
+            this.outputState(this.finalOutput);
+        }
+
+    }
+}
+
+class GameState {
+    constructor(vertices, edges) {
+        this.vertices = vertices;
+        this.selectedVertices = [];
+        this.highlightedVertices = new Set();
+
+        this.gameTimer = new GameTimer();
+
+        this.edges = edges;
+
+        this.edgesMap = {};
+        edges.forEach(edge => {
+            this.edgesMap[edge.ID] = edge;
+        });
+
+        this.intersectEdgeIDs = new Set();
+        this.checkIntersections();
+
+
+        this.prevMouseP = null;
+
+    }
+
+    checkIntersections() {
+        /**
+         * Находит все пересечения, обновляет список пересечений и возвращает кол-во пересечений
+         */
+        var segments = {}
+        this.edges.forEach(edge => {
+            segments[edge.ID] = edge.toSegment();
+        });
+        let newIntersectEdgeIDs = new Set(
+            findIntersections(segments)
+                .flatMap(intersect => intersect.segmentID)
+        );
+        let toIntersect = newIntersectEdgeIDs.difference(this.intersectEdgeIDs);
+        let toClear = this.intersectEdgeIDs.difference(newIntersectEdgeIDs);
+        toIntersect.forEach(edgeID => this.edgesMap[edgeID].isIntersect = true);
+        toClear.forEach(edgeID => this.edgesMap[edgeID].isIntersect = false);
+        this.intersectEdgeIDs = newIntersectEdgeIDs;
+
+        return this.intersectEdgeIDs.size;
+    }
+
+
+    freeVertices() {
+        this.selectedVertices = [];
+
+        this.highlightedVertices.forEach(vertex => {
+            vertex.isHighlighted = false;
+        });
+        this.highlightedVertices = new Set();
+    }
+
+
+    selectVertices(mouseP) {
+        const touchedVertex =this. vertices.filter(v => isHitboxHit(mouseP.x, mouseP.y, v))[0];
+        if (touchedVertex) {
+            this.selectedVertices.push(touchedVertex);
+        }
+
+        // highlight selected vertices and their neighbors
+        this.selectedVertices.forEach(vertex => {
+            if (this.highlightedVertices.has(vertex)) {
+                return;
+            }
+            vertex.isHighlighted = true;
+            this.highlightedVertices.add(vertex);
+            vertex.neighbors.forEach(neighborVertex => {
+                if (this.highlightedVertices.has(neighborVertex)) {
+                    return;
+                }
+                neighborVertex.isHighlighted = true;
+                this.highlightedVertices.add(neighborVertex);
+        });
+        });
+
+        this.prevMouseP = mouseP;
+    }
+
+    moveSelectedVertices(mouseP) {
+        if (!this.prevMouseP) {
+            return;
+        }
+        const deltaMouseP = {
+            x: mouseP.x - this.prevMouseP.x,
+            y: mouseP.y - this.prevMouseP.y,
+        }
+        this.selectedVertices.forEach(vertex => {
+            if (vertex) {
+                vertex.x += deltaMouseP.x;
+                vertex.y += deltaMouseP.y;
+            }
+        });
+        this.prevMouseP = mouseP;
+    }
+}
+
+/**
+ * 
+ * @param {Edge} e1 
+ * @param {Edge} e2 
+ * @returns boolean
+ */
+function edgesIntersect(e1, e2) {
+    const det = (a, b, c, d) => a * d - b * c;
+
+    const x1 = e1.v1.x;
+    const y1 = e1.v1.y;
+    const x2 = e1.v2.x;
+    const y2 = e1.v2.y;
+    const x3 = e2.v1.x;
+    const y3 = e2.v1.y;
+    const x4 = e2.v2.x;
+    const y4 = e2.v2.y;
+
+    const denom = det(x1 - x2, y1 - y2, x3 - x4, y3 - y4);
+    if (denom === 0) return false;
+
+    const t = det(x1 - x3, y1 - y3, x3 - x4, y3 - y4) / denom;
+    const u = det(x1 - x3, y1 - y3, x1 - x2, y1 - y2) / denom;
+
+    return t > 0 && t < 1 && u > 0 && u < 1;
 }
 
 function isHitboxHit(x, y, vertex) {
@@ -75,158 +211,68 @@ function isHitboxHit(x, y, vertex) {
             && (vertex.y - hitbox.y <= y && y <= vertex.y + hitbox.y)
 }
 
-function freeVertices() {
-    selectedVertices = [];
-
-    highlightedVertices.forEach(vertex => {
-        vertex.isHighlighted = false;
-    });
-    highlightedVertices = new Set();
-}
+function initDelaunatorPlanarGraph() {
 
 
-var prevMouseP = null;
+    function generateDelaunatorPlanarGraph(vertexCount, width, height, hitboxRadius = 5) {
+        // Generate random vertices
+        const vertices = [];
+        const points = [];
 
-function selectVertices(mouseP) {
-    const touchedVertex = vertices.filter(v => isHitboxHit(mouseP.x, mouseP.y, v))[0];
-    if (touchedVertex) {
-        selectedVertices.push(touchedVertex);
-    }
-
-    // highlight selected vertices and their neighbors
-    selectedVertices.forEach(vertex => {
-        if (highlightedVertices.has(vertex)) {
-            return;
-        }
-        vertex.isHighlighted = true;
-        highlightedVertices.add(vertex);
-        vertex.neighbors.forEach(neighborVertex => {
-            if (highlightedVertices.has(neighborVertex)) {
-                return;
-            }
-            neighborVertex.isHighlighted = true;
-            highlightedVertices.add(neighborVertex);
-    });
-    });
-
-    prevMouseP = mouseP;
-}
-
-function moveSelectedVertices(e) {
-    if (!prevMouseP) {
-        return;
-    }
-    const mouseC = WindowToCanvas(e.clientX, e.clientY)
-    const mouseP = CanvasToPlane(mouseC.x, mouseC.y);
-    deltaMouseP = {
-        x: mouseP.x - prevMouseP.x,
-        y: mouseP.y - prevMouseP.y,
-    }
-    selectedVertices.forEach(vertex => {
-        if (vertex) {
-            vertex.x += deltaMouseP.x;
-            vertex.y += deltaMouseP.y;
-        }
-    });
-    prevMouseP = mouseP;
-}
-
-
-
-function initPlanarGraph() {
-    /**
-     * 
-     * @param {Edge} e1 
-     * @param {Edge} e2 
-     * @returns boolean
-     */
-    function edgesIntersect(e1, e2) {
-        const det = (a, b, c, d) => a * d - b * c;
-
-        const x1 = e1.v1.x;
-        const y1 = e1.v1.y;
-        const x2 = e1.v2.x;
-        const y2 = e1.v2.y;
-        const x3 = e2.v1.x;
-        const y3 = e2.v1.y;
-        const x4 = e2.v2.x;
-        const y4 = e2.v2.y;
-
-        const denom = det(x1 - x2, y1 - y2, x3 - x4, y3 - y4);
-        if (denom === 0) return false;
-
-        const t = det(x1 - x3, y1 - y3, x3 - x4, y3 - y4) / denom;
-        const u = det(x1 - x3, y1 - y3, x1 - x2, y1 - y2) / denom;
-
-        return t > 0 && t < 1 && u > 0 && u < 1;
-    }
-
-    function addEdge(edges, newEdge) {
-        for (let edge of edges) {
-            if (edgesIntersect(edge, newEdge)) return false;
-        }
-        edges.push(newEdge);
-        return true;
-    }
-
-    function generatePlanarGraph(n = 10) {
-        vertices = [];
-        edges = [];
-        edgesMap = {};
-        intersectEdgeIDs = new Set();
-
-        for (let i = 0; i < n; i++) {
-            let x = Math.random() * (config.gamePlaneWidth - 2 * config.vertexRadius) + config.vertexRadius;
-            let y = Math.random() * (config.gamePlaneHeight - 2 * config.vertexRadius) + config.vertexRadius;
-            vertices.push(new Vertex(x, y, config.vertexRadius));
+        for (let i = 0; i < vertexCount; i++) {
+            let x = Math.random() * width;
+            let y = Math.random() * height;
+            const vertex = new Vertex(x, y, hitboxRadius);
+            vertices.push(vertex);
+            points.push([x, y]);
         }
 
-        // Основной проход: случайные рёбра
-        for (let i = 0; i < n; i++) {
-            for (let j = i + 1; j < n; j++) {
-                if (Math.random() < 0.2) {
-                    const edge = new Edge(vertices[i], vertices[j]);
-                    if (addEdge(edges, edge)) {
-                        vertices[i].neighbors.push(vertices[j]);
-                        vertices[j].neighbors.push(vertices[i]);
+        // Perform Delaunay triangulation
+        const delaunay = Delaunator.from(points);
+        const edgesSet = new Set();
+        const edges = [];
+
+        // Helper to create unique edge key
+        function edgeKey(i, j) {
+            return i < j ? `${i}-${j}` : `${j}-${i}`;
+        }
+
+        // Extract edges from triangles
+        for (let i = 0; i < delaunay.triangles.length; i += 3) {
+            const tri = [
+                delaunay.triangles[i],
+                delaunay.triangles[i + 1],
+                delaunay.triangles[i + 2]
+            ];
+
+            for (let j = 0; j < 3; j++) {
+                const a = tri[j];
+                const b = tri[(j + 1) % 3];
+                const key = edgeKey(a, b);
+                if (!edgesSet.has(key)) {
+                    edgesSet.add(key);
+                    const edge = new Edge(vertices[a], vertices[b]);
+                    edges.push(edge);
+
+                    // Add neighbors
+                    if (!vertices[a].neighbors.includes(vertices[b])) {
+                        vertices[a].neighbors.push(vertices[b]);
+                    }
+                    if (!vertices[b].neighbors.includes(vertices[a])) {
+                        vertices[b].neighbors.push(vertices[a]);
                     }
                 }
             }
         }
 
-        // Гарантируем минимум 2 соседа
-        let attemptsCounter = 0;
-        for (let i = 0; i < n; i++) {
-            while (vertices[i].neighbors.length < 2 && attemptsCounter++ < 1000) {
-                // Пытаемся соединить с другой случайной вершиной
-                const candidates = vertices
-                    .filter((v, j) => i !== j && !vertices[i].neighbors.includes(v));
-
-                if (candidates.length === 0) break;
-
-                const randIndex = Math.floor(Math.random() * candidates.length);
-                const vj = candidates[randIndex];
-                const edge = new Edge(vertices[i], vj);
-
-                if (addEdge(edges, edge)) {
-                    vertices[i].neighbors.push(vj);
-                    vj.neighbors.push(vertices[i]);
-                }
-            }
-        }
-        edges.forEach(edge => {
-            edgesMap[edge.ID] = edge;
-        });
-
-        if (attemptsCounter >= 1000) {
-            return false;
-        } else {
-            return true;
-        }
+        return {
+            "vertices": vertices,
+            "edges": edges
+        };
     }
 
     /**
-     * Перераскидывает вершины случайным образом по игровому полю
+     * Мешает вершины случайным образом по игровому полю
      * @param {Vertex[]} vertices - массив вершин графа
      * @param {number} width - ширина игрового поля
      * @param {number} height - высота игрового поля
@@ -239,17 +285,15 @@ function initPlanarGraph() {
         }
     }
 
-    // пытаемся сгенерировать граф столько раз, пока не выйдет
-    let attemptsCounter = 0;
-    while (!generatePlanarGraph(config.verticesCount) && attemptsCounter++ <= 5000) {
-        console.warn('Failed to generate planar graph. Retrying...');
-    }
-    if (attemptsCounter < 5000) {
-        scatterVerticesRandomly(vertices, config.gamePlaneWidth, config.gamePlaneHeight, config.vertexRadius)
-    } else {
-        console.error('Failed to generate planar graph after 5k attempts. Stopping...');
-    }
+
+
+    var output = generateDelaunatorPlanarGraph(config.verticesCount, config.gamePlaneWidth, config.gamePlaneHeight, config.vertexRadius);
+    var gameState =  new GameState(output.vertices, output.edges);
+    scatterVerticesRandomly(gameState.vertices, config.gamePlaneWidth, config.gamePlaneHeight, config.vertexRadius);
+
+    return gameState;
 }
+
 
 function initManualGraph() {
     var v1 = new Vertex(250, 250, config.vertexRadius);
@@ -260,9 +304,9 @@ function initManualGraph() {
     v2.neighbors = [v1, v3, v4];
     v3.neighbors = [v1, v2, v4];
     v4.neighbors = [v1, v2, v3];
-    vertices = [v1, v2, v3, v4];
+    var vertices = [v1, v2, v3, v4];
 
-    edges = [
+    var edges = [
         new Edge(v1, v2),
         new Edge(v1, v3),
         new Edge(v1, v4),
@@ -270,7 +314,10 @@ function initManualGraph() {
         new Edge(v2, v4),
         new Edge(v3, v4)
     ];
-    edges.forEach(edge => {
-        edgesMap[edge.ID] = edge;
-    });
+
+    return new GameState(vertices, edges)
+}
+
+function initPlanarGraph() {
+    return initDelaunatorPlanarGraph();
 }

@@ -49,22 +49,7 @@ window.onresize = function() {
     canvas.height = innerHeight;
 }
 
-canvas.addEventListener('mousedown', (e) => {
-    const mouseC = WindowToCanvas(e.clientX, e.clientY)
-    const mouseP = CanvasToPlane(mouseC.x, mouseC.y);
-    selectVertices(mouseP);
-});
-canvas.addEventListener('mousemove', (e) => {
-    const mouseC = WindowToCanvas(e.clientX, e.clientY)
-    const mouseP = CanvasToPlane(mouseC.x, mouseC.y);
-    moveSelectedVertices(e)
-});
-canvas.addEventListener('mouseup', () => {
-    freeVertices();
-});
-canvas.addEventListener('mouseleave', () => {
-    freeVertices();
-});
+
 
 
 
@@ -73,7 +58,7 @@ function drawBackground() {
     context.fillRect(0, 0, canvas.width, canvas.height);
 }
 
-function drawVertices() {
+function drawVertices(vertices) {
     vertices.forEach(vertex => {
         let point = PlaneToCanvas(vertex.x, vertex.y);
 
@@ -91,7 +76,7 @@ function drawVertices() {
     });
 }
 
-function drawEdges() {
+function drawEdges(edges) {
     edges.forEach(edge => {
         let planeSegment = edge.toSegment();
         let windowSegmentStart = PlaneToCanvas(planeSegment[0][0], planeSegment[0][1]);
@@ -115,71 +100,50 @@ function drawEdges() {
     });
 }
 
-class StateMachine {
-    constructor() {
-        this.isNoIntersectionAchieved = true;
-        this.outputState = (output => {
-            console.log(output)
-        });
-        this.finalOutput = null;
-    }
 
-    measureTime() {
-        const currentTime = performance.now();
-        const elapsedTime = (currentTime - this.startTime) / 1000; // в секундах
-        const roundedTime = Math.round(elapsedTime * 10) / 10; // округляем до 0.1
-        return roundedTime;
-    }
 
-    start() {
-        this.startTime = performance.now();
-        this.isNoIntersectionAchieved = true;
-        this.finalOutput = null;
-    }
-    updateState(countOfIntersections) {
-        if (this.isNoIntersectionAchieved) {
-            const output = `${countOfIntersections} intersections in ${this.measureTime()} s`;
-            this.outputState(output);
-            if (countOfIntersections === 0) {
-                this.isNoIntersectionAchieved = false;
-                this.finalOutput = output;
-            }
-        } else {
-            this.outputState(this.finalOutput);
-        }
-
-    }
-}
-var stateMachine = new StateMachine();
-
-function loop() {
-    const countOfIntersections = checkIntersections();
+function loop(gameState) {
+    let intersectCount = gameState.checkIntersections();
 
     drawBackground();
 
-    drawEdges();
-    drawVertices();
+    drawEdges(gameState.edges);
+    drawVertices(gameState.vertices);
 
-    stateMachine.updateState(countOfIntersections);
-    requestAnimationFrame(loop);
+    gameState.gameTimer.updateState(intersectCount);
+    requestAnimationFrame(() => loop(gameState));
 }
 
 
 function init() {
-    initPlanarGraph();
-    // initManualGraph();
+    var gameState = initDelaunatorPlanarGraph();
+    gameState.gameTimer.outputState = (output => document.getElementById("textOutput").textContent = output);
+    canvas.addEventListener('mousedown', (e) => {
+        const mouseC = WindowToCanvas(e.clientX, e.clientY)
+        const mouseP = CanvasToPlane(mouseC.x, mouseC.y);
+        gameState.selectVertices(mouseP);
+    });
+    canvas.addEventListener('mousemove', (e) => {
+        const mouseC = WindowToCanvas(e.clientX, e.clientY)
+        const mouseP = CanvasToPlane(mouseC.x, mouseC.y);
+        gameState.moveSelectedVertices(mouseP)
+    });
+    canvas.addEventListener('mouseup', () => {
+        gameState.freeVertices();
+    });
+    canvas.addEventListener('mouseleave', () => {
+        gameState.freeVertices();
+    });
 
-    stateMachine.start(); 
+    gameState.gameTimer.start(); 
 
-    loop();
+    loop(gameState);
 }
 
 document.addEventListener("DOMContentLoaded", () => {
     const verticesInput = document.getElementById("verticesInput");
-    const textOutput = document.getElementById("textOutput");
     const startButton = document.getElementById("startButton");
 
-    stateMachine.outputState = (output => textOutput.textContent = output);
 
     startButton.addEventListener("click", () => {
         config.verticesCount = Number(verticesInput.value);
