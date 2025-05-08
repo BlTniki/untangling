@@ -1,3 +1,7 @@
+if (!EPS) {
+    const EPS = 1E-9;
+}
+
 class Vertex {
     constructor (x, y, hitboxRadius, neighbors=null) {
         this.x = x;
@@ -30,7 +34,7 @@ class Edge {
         // смещение начала сегмента и конца на радиус хитбокса вершины
         // чтобы при поиске пересечений сегментов пересечения на концах сегментов не учитывалось
         let r = [this.v2.x - this.v1.x, this.v2.y - this.v1.y]; // вектор перехода из v1 в v2
-        let d = 1 / Math.sqrt(r[0]*r[0] + r[1]*r[1]); // необходимая длина вектора смещения
+        let d = 2 * EPS; // необходимая длина вектора смещения
         let dr = [d*r[0], d*r[1]]; // необходимый вектор смещения
         return [
             [this.v1.x + dr[0], this.v1.y + dr[1]],
@@ -102,14 +106,23 @@ class GameState {
         /**
          * Находит все пересечения, обновляет список пересечений и возвращает кол-во пересечений
          */
-        var segments = {}
+        var segments = {};
         this.edges.forEach(edge => {
             segments[edge.ID] = edge.toSegment();
         });
         let newIntersectEdgeIDs = new Set(
-            findIntersections(segments)
-                .flatMap(intersect => intersect.segmentID)
+            // Тут у нас использование супер навороченного алгоритма
+            // findIntersections(segments)
+            //     .flatMap(intersect => intersect.segmentID)
         );
+        this.edges.forEach(curEdge => {
+            this.edges.forEach(otherEdge => {
+                // Проверяем что это два разных ребра и что они пересекаются
+                if (curEdge.ID != otherEdge.ID & edgesIntersect(curEdge, otherEdge)) {
+                    newIntersectEdgeIDs.add(curEdge.ID);
+                }
+            });
+        });
         let toIntersect = newIntersectEdgeIDs.difference(this.intersectEdgeIDs);
         let toClear = this.intersectEdgeIDs.difference(newIntersectEdgeIDs);
         toIntersect.forEach(edgeID => this.edgesMap[edgeID].isIntersect = true);
@@ -182,22 +195,18 @@ class GameState {
 function edgesIntersect(e1, e2) {
     const det = (a, b, c, d) => a * d - b * c;
 
-    const x1 = e1.v1.x;
-    const y1 = e1.v1.y;
-    const x2 = e1.v2.x;
-    const y2 = e1.v2.y;
-    const x3 = e2.v1.x;
-    const y3 = e2.v1.y;
-    const x4 = e2.v2.x;
-    const y4 = e2.v2.y;
+    const x1 = e1.v1.x, y1 = e1.v1.y;
+    const x2 = e1.v2.x, y2 = e1.v2.y;
+    const x3 = e2.v1.x, y3 = e2.v1.y;
+    const x4 = e2.v2.x, y4 = e2.v2.y;
 
     const denom = det(x1 - x2, y1 - y2, x3 - x4, y3 - y4);
-    if (denom === 0) return false;
+    if (Math.abs(denom) < EPS) return false; // параллельны или совпадают
 
     const t = det(x1 - x3, y1 - y3, x3 - x4, y3 - y4) / denom;
     const u = det(x1 - x3, y1 - y3, x1 - x2, y1 - y2) / denom;
 
-    return t > 0 && t < 1 && u > 0 && u < 1;
+    return t > EPS && t < 1 - EPS && u > EPS && u < 1 - EPS;
 }
 
 function isHitboxHit(x, y, vertex) {
@@ -214,14 +223,15 @@ function isHitboxHit(x, y, vertex) {
 function initDelaunatorPlanarGraph(gameConfig) {
 
 
-    function generateDelaunatorPlanarGraph(vertexCount, width, height, hitboxRadius = 5) {
+    function generateDelaunatorPlanarGraph(vertexCount, hitboxRadius = 5) {
         // Generate random vertices
         const vertices = [];
         const points = [];
 
         for (let i = 0; i < vertexCount; i++) {
-            let x = Math.random() * width;
-            let y = Math.random() * height;
+            // Игровое поле -1, 1
+            let x = (Math.random() * 2) - 1;
+            let y = (Math.random() * 2) - 1;
             const vertex = new Vertex(x, y, hitboxRadius);
             vertices.push(vertex);
             points.push([x, y]);
@@ -274,41 +284,30 @@ function initDelaunatorPlanarGraph(gameConfig) {
     /**
      * Мешает вершины случайным образом по игровому полю
      * @param {Vertex[]} vertices - массив вершин графа
-     * @param {number} width - ширина игрового поля
-     * @param {number} height - высота игрового поля
-     * @param {number} margin - отступ от краёв (обычно равен радиусу вершины)
      */
-    function scatterVerticesRandomly(vertices, width, height, margin) {
+    function scatterVerticesRandomly(vertices) {
         for (let v of vertices) {
-            v.x = Math.random() * (width - 2 * margin) + margin;
-            v.y = Math.random() * (height - 2 * margin) + margin;
+            v.x = Math.random() * 2 - 1;
+            v.y = Math.random() * 2 - 1;
         }
     }
 
-
-
-    var output = generateDelaunatorPlanarGraph(
+    let output = generateDelaunatorPlanarGraph(
         gameConfig.verticesCount,
-        gameConfig.gamePlaneWidth,
-        gameConfig.gamePlaneHeight,
         gameConfig.vertexRadius
     );
-    var gameState =  new GameState(output.vertices, output.edges);
-    scatterVerticesRandomly(gameState.vertices,
-        gameConfig.gamePlaneWidth,
-        gameConfig.gamePlaneHeight,
-        gameConfig.vertexRadius
-    );
+    let gameState =  new GameState(output.vertices, output.edges);
+    scatterVerticesRandomly(gameState.vertices);
 
     return gameState;
 }
 
 
 function initManualGraph(gameConfig) {
-    var v1 = new Vertex(250, 250, gameConfig.vertexRadius);
-    var v2 = new Vertex(750, 250, gameConfig.vertexRadius);
-    var v3 = new Vertex(250, 750, gameConfig.vertexRadius);
-    var v4 = new Vertex(750, 750, gameConfig.vertexRadius);
+    var v1 = new Vertex(-0.5, -0.5, gameConfig.vertexRadius);
+    var v2 = new Vertex(-0.5, 0.5, gameConfig.vertexRadius);
+    var v3 = new Vertex(0.5, -0.5, gameConfig.vertexRadius);
+    var v4 = new Vertex(0.5, 0.5, gameConfig.vertexRadius);
     v1.neighbors = [v2, v3, v4];
     v2.neighbors = [v1, v3, v4];
     v3.neighbors = [v1, v2, v4];

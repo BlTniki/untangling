@@ -1,6 +1,4 @@
 config = {
-    gamePlaneWidth: 1000,
-    gamePlaneHeight: 1000,
     verticesCount: 20,
     vertexRadius: 12,
     basicVertexColor: 'rgb(0, 80, 177)',
@@ -12,7 +10,7 @@ config = {
 }
 
 if (!EPS) {
-    var EPS = 1E-9;
+    const EPS = 1E-9;
 }
 
 function buildGameLoop(gameState, scene) {
@@ -36,6 +34,7 @@ function buildGameLoop(gameState, scene) {
 }
 
 function init() {
+    console.debug("Init game scene");
     const canvas = document.querySelector('canvas');
     window.onresize = function() {
         canvas.width = innerWidth;
@@ -43,18 +42,29 @@ function init() {
     }
 
     const scene = new Scene(canvas, config);
+    console.debug("Game scene initiated");
 
 
-    const gameState = initDelaunatorPlanarGraph(config);
+    console.debug("Init game");
+    const gameState = initManualGraph(config);//initDelaunatorPlanarGraph(config);
     gameState.gameTimer.outputState = (output => document.getElementById("textOutput").textContent = output);
+    const logInput = (eventType, e, mouseC, mouseP) => {
+        console.debug(
+            `Input "${eventType}": at window {x:${e.clientX}, y:${e.clientY}}, at canvas {x:${mouseC.x}, y:${mouseC.y}}, at plane {x:${mouseP.x}, y:${mouseP.y}}`
+        );
+    };
     canvas.addEventListener('mousedown', (e) => {
-        const mouseC = scene.WindowToCanvas(e.clientX, e.clientY, canvas);
-        const mouseP = scene.CanvasToPlane(mouseC.x, mouseC.y, canvas);
+        const mouseC = scene.WindowToCanvas(e.clientX, e.clientY);
+        const mouseP = scene.CanvasToPlane(mouseC.x, mouseC.y);
+
+        logInput('mousedown', e, mouseC, mouseP);
         gameState.selectVertices(mouseP);
     });
     canvas.addEventListener('mousemove', (e) => {
-        const mouseC = scene.WindowToCanvas(e.clientX, e.clientY, canvas);
-        const mouseP = scene.CanvasToPlane(mouseC.x, mouseC.y, canvas);
+        const mouseC = scene.WindowToCanvas(e.clientX, e.clientY);
+        const mouseP = scene.CanvasToPlane(mouseC.x, mouseC.y);
+
+        logInput('mousemove', e, mouseC, mouseP);
         gameState.moveSelectedVertices(mouseP)
     });
     canvas.addEventListener('mouseup', () => {
@@ -63,10 +73,12 @@ function init() {
     canvas.addEventListener('mouseleave', () => {
         gameState.freeVertices();
     });
+    console.debug("Game initiated");
 
 
     const loop = buildGameLoop(gameState, scene);
 
+    console.debug("Starting the game...");
     gameState.gameTimer.start(); 
     loop();
 }

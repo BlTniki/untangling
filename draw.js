@@ -9,18 +9,24 @@ class Scene {
         this.sceneConfig = sceneConfig;
     }
 
+    /**
+     * Отображение векторов игрового поля [-1, 1] на холст
+     */
     PlaneToCanvas(x, y) {
         return {
-            x: x * this.canvas.width / this.sceneConfig.gamePlaneWidth,
-            y: y * this.canvas.height / this.sceneConfig.gamePlaneHeight
+            x: (x + 1) / 2 * this.canvas.width,
+            y: (y + 1) / 2 * this.canvas.height
         }
     }
 
+    /**
+     * Отображение векторов холста на игровое поле [-1, 1]
+     */
     CanvasToPlane(x, y) {
         return {
-            x: x / this.canvas.width * this.sceneConfig.gamePlaneWidth,
-            y: y / this.canvas.height * this.sceneConfig.gamePlaneHeight
-        }
+            x: x / this.canvas.width * 2 - 1,
+            y: y / this.canvas.height * 2 - 1
+        };
     }
 
     WindowToCanvas(x, y) {
@@ -37,7 +43,7 @@ class Scene {
 
     drawVertices(vertices) {
         vertices.forEach(vertex => {
-            let point = this.PlaneToCanvas(vertex.x, vertex.y, this.canvas);
+            let point = this.PlaneToCanvas(vertex.x, vertex.y);
 
             this.context.beginPath();
             this.context.arc(point.x, point.y, this.sceneConfig.vertexRadius, 0, Math.PI*2);
@@ -56,8 +62,8 @@ class Scene {
     drawEdges(edges) {
         edges.forEach(edge => {
             let planeSegment = edge.toSegment();
-            let windowSegmentStart = this.PlaneToCanvas(planeSegment[0][0], planeSegment[0][1], this.canvas);
-            let windowSegmentEnd = this.PlaneToCanvas(planeSegment[1][0], planeSegment[1][1], this.canvas);
+            let windowSegmentStart = this.PlaneToCanvas(planeSegment[0][0], planeSegment[0][1]);
+            let windowSegmentEnd = this.PlaneToCanvas(planeSegment[1][0], planeSegment[1][1]);
 
             this.context.beginPath();
             this.context.moveTo(windowSegmentStart.x, windowSegmentStart.y);
