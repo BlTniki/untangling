@@ -29,11 +29,27 @@ class Scene {
         };
     }
 
+    /**
+     * Отображение векторов Рельного окна на холст
+     */
     WindowToCanvas(x, y) {
         return {
             x: x - this.canvasBoundary.x,
             y: y - this.canvasBoundary.y
         }
+    }
+
+    /**
+     * Возвращает радиус области, попавшие в которую вершины будут считаться попавшими
+     */
+    HitRadiusOnPlane() {
+        // прити хаки вей ту калк нужный радиус
+        let vertical = this.CanvasToPlane(this.sceneConfig.vertexRadius, 0);
+        let horizontal = this.CanvasToPlane(0, this.sceneConfig.vertexRadius);
+        return {
+            "vertical": vertical.x - vertical.y,
+            "horizontal": horizontal.y - horizontal.x
+        };
     }
 
     drawBackground() {

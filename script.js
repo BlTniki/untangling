@@ -1,9 +1,9 @@
 config = {
     verticesCount: 20,
-    vertexRadius: 12,
+    vertexRadius: 10,
     basicVertexColor: 'rgb(0, 80, 177)',
     highlightedVertexColor: 'rgb(177, 0, 0)',
-    edgeWidth: 3,
+    edgeWidth: 2,
     basicEdgeColor: 'rgb(0,0,0)',
     highlightedEdgeColor: 'rgb(223, 216, 0)',
     backgroundColor: 'rgb(255, 255, 255)'
@@ -46,7 +46,7 @@ function init() {
 
 
     console.debug("Init game");
-    const gameState = initManualGraph(config);//initDelaunatorPlanarGraph(config);
+    const gameState = initDelaunatorPlanarGraph(config);
     gameState.gameTimer.outputState = (output => document.getElementById("textOutput").textContent = output);
     const logInput = (eventType, e, mouseC, mouseP) => {
         console.debug(
@@ -56,9 +56,10 @@ function init() {
     canvas.addEventListener('mousedown', (e) => {
         const mouseC = scene.WindowToCanvas(e.clientX, e.clientY);
         const mouseP = scene.CanvasToPlane(mouseC.x, mouseC.y);
+        const hitZone = scene.HitRadiusOnPlane();
 
         logInput('mousedown', e, mouseC, mouseP);
-        gameState.selectVertices(mouseP);
+        gameState.selectVertices(mouseP, hitZone);
     });
     canvas.addEventListener('mousemove', (e) => {
         const mouseC = scene.WindowToCanvas(e.clientX, e.clientY);

@@ -102,18 +102,11 @@ class GameState {
 
     }
 
+    /**
+     * Находит все пересечения, обновляет список пересечений и возвращает кол-во пересечений
+     */
     checkIntersections() {
-        /**
-         * Находит все пересечения, обновляет список пересечений и возвращает кол-во пересечений
-         */
-        var segments = {};
-        this.edges.forEach(edge => {
-            segments[edge.ID] = edge.toSegment();
-        });
         let newIntersectEdgeIDs = new Set(
-            // Тут у нас использование супер навороченного алгоритма
-            // findIntersections(segments)
-            //     .flatMap(intersect => intersect.segmentID)
         );
         this.edges.forEach(curEdge => {
             this.edges.forEach(otherEdge => {
@@ -143,8 +136,8 @@ class GameState {
     }
 
 
-    selectVertices(mouseP) {
-        const touchedVertex =this. vertices.filter(v => isHitboxHit(mouseP.x, mouseP.y, v))[0];
+    selectVertices(mouseP, hitZone) {
+        const touchedVertex = this.vertices.filter(v => isVertexHit(mouseP.x, mouseP.y, hitZone, v))[0];
         if (touchedVertex) {
             this.selectedVertices.push(touchedVertex);
         }
@@ -209,20 +202,13 @@ function edgesIntersect(e1, e2) {
     return t > EPS && t < 1 - EPS && u > EPS && u < 1 - EPS;
 }
 
-function isHitboxHit(x, y, vertex) {
-    // Так как у нас есть отображение одного базиса на другой,
-    // а хитбокс обрабатывается в игровом поле,
-    // при сжатии окна хитбокс будет сжиматься,
-    // а нарисованный радиус вершины -- нет,
-    // поэтому мы тут отжимаем хитбокс обратно
-    hitbox = {"x": vertex.hitboxRadius, "y":vertex.hitboxRadius};// Будем пытаться избавиться от этого маппинга CanvasToPlane(vertex.hitboxRadius, vertex.hitboxRadius);
-    return (vertex.x - hitbox.x <= x && x <= vertex.x + hitbox.x)
-            && (vertex.y - hitbox.y <= y && y <= vertex.y + hitbox.y)
+
+function isVertexHit(x, y, hitZone, vertex) {
+    return (x - hitZone.vertical <= vertex.x && vertex.x <= x + hitZone.vertical)
+            && (y - hitZone.horizontal <= vertex.y && vertex.y <= y + hitZone.horizontal)
 }
 
 function initDelaunatorPlanarGraph(gameConfig) {
-
-
     function generateDelaunatorPlanarGraph(vertexCount, hitboxRadius = 5) {
         // Generate random vertices
         const vertices = [];
