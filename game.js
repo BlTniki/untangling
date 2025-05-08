@@ -206,12 +206,12 @@ function isHitboxHit(x, y, vertex) {
     // при сжатии окна хитбокс будет сжиматься,
     // а нарисованный радиус вершины -- нет,
     // поэтому мы тут отжимаем хитбокс обратно
-    hitbox = CanvasToPlane(vertex.hitboxRadius, vertex.hitboxRadius);
+    hitbox = {"x": vertex.hitboxRadius, "y":vertex.hitboxRadius};// Будем пытаться избавиться от этого маппинга CanvasToPlane(vertex.hitboxRadius, vertex.hitboxRadius);
     return (vertex.x - hitbox.x <= x && x <= vertex.x + hitbox.x)
             && (vertex.y - hitbox.y <= y && y <= vertex.y + hitbox.y)
 }
 
-function initDelaunatorPlanarGraph() {
+function initDelaunatorPlanarGraph(gameConfig) {
 
 
     function generateDelaunatorPlanarGraph(vertexCount, width, height, hitboxRadius = 5) {
@@ -287,19 +287,28 @@ function initDelaunatorPlanarGraph() {
 
 
 
-    var output = generateDelaunatorPlanarGraph(config.verticesCount, config.gamePlaneWidth, config.gamePlaneHeight, config.vertexRadius);
+    var output = generateDelaunatorPlanarGraph(
+        gameConfig.verticesCount,
+        gameConfig.gamePlaneWidth,
+        gameConfig.gamePlaneHeight,
+        gameConfig.vertexRadius
+    );
     var gameState =  new GameState(output.vertices, output.edges);
-    scatterVerticesRandomly(gameState.vertices, config.gamePlaneWidth, config.gamePlaneHeight, config.vertexRadius);
+    scatterVerticesRandomly(gameState.vertices,
+        gameConfig.gamePlaneWidth,
+        gameConfig.gamePlaneHeight,
+        gameConfig.vertexRadius
+    );
 
     return gameState;
 }
 
 
-function initManualGraph() {
-    var v1 = new Vertex(250, 250, config.vertexRadius);
-    var v2 = new Vertex(750, 250, config.vertexRadius);
-    var v3 = new Vertex(250, 750, config.vertexRadius);
-    var v4 = new Vertex(750, 750, config.vertexRadius);
+function initManualGraph(gameConfig) {
+    var v1 = new Vertex(250, 250, gameConfig.vertexRadius);
+    var v2 = new Vertex(750, 250, gameConfig.vertexRadius);
+    var v3 = new Vertex(250, 750, gameConfig.vertexRadius);
+    var v4 = new Vertex(750, 750, gameConfig.vertexRadius);
     v1.neighbors = [v2, v3, v4];
     v2.neighbors = [v1, v3, v4];
     v3.neighbors = [v1, v2, v4];
@@ -318,6 +327,6 @@ function initManualGraph() {
     return new GameState(vertices, edges)
 }
 
-function initPlanarGraph() {
-    return initDelaunatorPlanarGraph();
+function initPlanarGraph(gameConfig) {
+    return initDelaunatorPlanarGraph(gameConfig);
 }

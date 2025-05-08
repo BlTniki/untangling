@@ -15,117 +15,46 @@ if (!EPS) {
     var EPS = 1E-9;
 }
 
+function buildGameLoop(gameState, scene) {
+    /**
+     * Просто удобный конструктор loop функции,
+     * чтобы меньше колдовать с передачей параметров в requestAnimationFrame ()
+     */
+    function loop() {
+        let intersectCount = gameState.checkIntersections();
 
-var canvas = document.querySelector('canvas');
-var canvasBoundary = canvas.getBoundingClientRect();
-canvas.width = canvasBoundary.width;
-canvas.height = canvasBoundary.height;
-context = canvas.getContext('2d');
+        scene.drawBackground();
 
-function PlaneToCanvas(x, y) {
-    return {
-        x: x * canvas.width / config.gamePlaneWidth,
-        y: y * canvas.height / config.gamePlaneHeight
+        scene.drawEdges(gameState.edges);
+        scene.drawVertices(gameState.vertices);
+
+        gameState.gameTimer.updateState(intersectCount);
+        requestAnimationFrame(loop);
     }
+
+    return loop;
 }
-
-function CanvasToPlane(x, y) {
-    return {
-        x: x / canvas.width * config.gamePlaneWidth,
-        y: y / canvas.height * config.gamePlaneHeight
-    }
-}
-
-function WindowToCanvas(x, y) {
-    const boundary = canvas.getBoundingClientRect();
-    return {
-        x: x - boundary.x,
-        y: y - boundary.y
-    }
-}
-
-window.onresize = function() {
-    canvas.width = innerWidth;
-    canvas.height = innerHeight;
-}
-
-
-
-
-
-function drawBackground() {
-    context.fillStyle = config.backgroundColor;
-    context.fillRect(0, 0, canvas.width, canvas.height);
-}
-
-function drawVertices(vertices) {
-    vertices.forEach(vertex => {
-        let point = PlaneToCanvas(vertex.x, vertex.y);
-
-        context.beginPath();
-        context.arc(point.x, point.y, config.vertexRadius, 0, Math.PI*2);
-        if (vertex.isHighlighted) {
-            context.fillStyle = config.highlightedVertexColor;
-        } else {
-            context.fillStyle = config.basicVertexColor;
-        }
-        context.fill();
-        context.lineWidth = config.vertexRadius * 0.1;
-        context.stroke();
-        context.closePath();
-    });
-}
-
-function drawEdges(edges) {
-    edges.forEach(edge => {
-        let planeSegment = edge.toSegment();
-        let windowSegmentStart = PlaneToCanvas(planeSegment[0][0], planeSegment[0][1]);
-        let windowSegmentEnd = PlaneToCanvas(planeSegment[1][0], planeSegment[1][1]);
-
-        context.beginPath();
-        context.moveTo(windowSegmentStart.x, windowSegmentStart.y);
-        context.lineTo(windowSegmentEnd.x, windowSegmentEnd.y);
-        const prevStrokeStyle = context.strokeStyle;
-        const prevStrokeWidth = context.lineWidth;
-        if (edge.isIntersect) {
-            context.strokeStyle = config.basicEdgeColor;
-        } else {
-            context.strokeStyle = config.highlightedEdgeColor;
-        }
-        context.lineWidth = config.edgeWidth;
-        context.stroke();
-        context.strokeStyle = prevStrokeStyle;
-        context.lineWidth = prevStrokeWidth;
-        context.closePath();
-    });
-}
-
-
-
-function loop(gameState) {
-    let intersectCount = gameState.checkIntersections();
-
-    drawBackground();
-
-    drawEdges(gameState.edges);
-    drawVertices(gameState.vertices);
-
-    gameState.gameTimer.updateState(intersectCount);
-    requestAnimationFrame(() => loop(gameState));
-}
-
 
 function init() {
-    var gameState = initDelaunatorPlanarGraph();
+    const canvas = document.querySelector('canvas');
+    window.onresize = function() {
+        canvas.width = innerWidth;
+        canvas.height = innerHeight;
+    }
+
+    const scene = new Scene(canvas, config);
+
+
+    const gameState = initDelaunatorPlanarGraph(config);
     gameState.gameTimer.outputState = (output => document.getElementById("textOutput").textContent = output);
     canvas.addEventListener('mousedown', (e) => {
-        const mouseC = WindowToCanvas(e.clientX, e.clientY)
-        const mouseP = CanvasToPlane(mouseC.x, mouseC.y);
+        const mouseC = scene.WindowToCanvas(e.clientX, e.clientY, canvas);
+        const mouseP = scene.CanvasToPlane(mouseC.x, mouseC.y, canvas);
         gameState.selectVertices(mouseP);
     });
     canvas.addEventListener('mousemove', (e) => {
-        const mouseC = WindowToCanvas(e.clientX, e.clientY)
-        const mouseP = CanvasToPlane(mouseC.x, mouseC.y);
+        const mouseC = scene.WindowToCanvas(e.clientX, e.clientY, canvas);
+        const mouseP = scene.CanvasToPlane(mouseC.x, mouseC.y, canvas);
         gameState.moveSelectedVertices(mouseP)
     });
     canvas.addEventListener('mouseup', () => {
@@ -135,9 +64,11 @@ function init() {
         gameState.freeVertices();
     });
 
-    gameState.gameTimer.start(); 
 
-    loop(gameState);
+    const loop = buildGameLoop(gameState, scene);
+
+    gameState.gameTimer.start(); 
+    loop();
 }
 
 document.addEventListener("DOMContentLoaded", () => {
